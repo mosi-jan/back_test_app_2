@@ -172,13 +172,22 @@ class DataBase:
 
     def get_second_data(self, en_symbol_12_digit_code, start_date, end_date):
         # date_time, open_price, high_price, low_price, close_price, trade_count, trade_volume, trade_value
-
         fields = ' date_time, open_price, high_price, low_price, close_price, trade_count, trade_volume, trade_value '
         query = 'select {0} from {1} where en_symbol_12_digit_code = %s and date_time <= {2} and date_time > {3} order by {4} desc'\
             .format(fields, 'share_second_data', end_date, start_date, 'date_time')
         args = en_symbol_12_digit_code
         print(query)
         return self.select_query(query=query, args=args, fetchall=True, write_log=True)
+
+    def get_second_data_for_grow(self, en_symbol_12_digit_code, start_date, end_date):
+        # date_time, open_price, high_price, low_price, close_price, trade_count, trade_volume, trade_value
+        fields = ' date_time, open_price, high_price, low_price, close_price, trade_count, trade_volume, trade_value '
+        query = 'select {0} from {1} where en_symbol_12_digit_code = %s and date_time < {2} and date_time >= {3} order by {4} desc'\
+            .format(fields, 'share_second_data', end_date, start_date, 'date_time')
+        args = en_symbol_12_digit_code
+        print(query)
+        return self.select_query(query=query, args=args, fetchall=True, write_log=True)
+
 
     def get_adjusted_data(self, en_symbol_12_digit_code, adjust_type):
         if adjust_type == constants.adjusted_type_none:

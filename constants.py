@@ -28,3 +28,11 @@ adjusted_mod_off = 'off'
 adjusted_mod_all_time = 'all_time'
 adjusted_mod_this_time = 'this_time'
 adjusted_mod_now_time = 'now_time'
+
+
+time_frame_s1 = 'S1'
+time_frame_m1 = 'M1'
+time_frame_h1 = 'H1'
+time_frame_d1 = 'D1'
+time_frame_mn1 = 'MN1'
+time_frame_y1 = 'Y1'

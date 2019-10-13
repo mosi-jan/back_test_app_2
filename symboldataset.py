@@ -43,11 +43,9 @@ class SymbolDataSet:
         # load time_frame_data ------------------------------------
         second_date, error = self.db.get_second_data(en_symbol_12_digit_code=self.en_symbol_12_digit_code,
                                                      start_date=self.start_date_time, end_date=self.today_date_time)
-        print(1)
         if error is not None:
             self.init_error = True
             return
-        # self.second_data = second_date
         self.time_frame_data = np.array(self.__second_to_time_frame(second_date))
 
         # load adjusted_data ------------------------------------
@@ -77,21 +75,10 @@ class SymbolDataSet:
             start_time_date = 0
 
             start = True
-            # coefficient = 1
-            # coefficient_date = int(source[0][0] / 1000000)
 
             for item in source:
                 p1 = 0
                 p1_time = p1
-
-                # item_date = int(item[date_time] / 1000000)
-                # if coefficient_date * 1000000 >= item[0]:
-                # if coefficient_date >= int(item[0] / 1000000):
-                #    for coeff in coefficient_list:
-                #        if coeff[0] < item_date :
-                #             coefficient_date = coeff[0]
-                #             break
-                #         coefficient = coeff[1]
 
                 if self.time_frame == 'S1':
                     p1 = item[date_time]
@@ -297,7 +284,136 @@ class SymbolDataSet:
 
     # ---------------------------------
     def __grow_time_frame_data(self, candle_index, candle_count):
-        pass
+
+        while candle_index + 1 + candle_count > self.time_frame_data.shape[0]:
+            today_date_time = self.time_frame_data[-1, 0]
+            candle_needed = candle_index + candle_count - self.time_frame_data.shape[0] + 1
+            start_date_time = self.estimate_time(base_time=today_date_time,
+                                                 part_count=candle_needed,
+                                                 time_frame=self.time_frame)
+
+            second_date, error = self.db.get_second_data_for_grow(en_symbol_12_digit_code=self.en_symbol_12_digit_code,
+                                                                  start_date=start_date_time,
+                                                                  end_date=today_date_time)
+            if error is not None:
+                self.init_error = True
+                return
+
+            if len(second_date) == 0:
+                self.no_any_data = True
+                return
+
+            # self.time_frame_data = np.array(self.__second_to_time_frame(second_date))
+            np.vstack((self.time_frame_data, np.array(self.__second_to_time_frame(second_date))))
+
+    def estimate_time(self, base_time, part_count, time_frame):
+        import datetime
+        second = base_time % 100
+        minute = int(base_time / 100) % 100
+        hour = int(base_time / 10000) % 100
+        day = int(base_time / 1000000) % 100
+        month = int(base_time / 100000000) % 100
+        year = int(base_time / 10000000000) % 10000
+        r = datetime.datetime(year=year, month=month, day=day, hour=hour, minute=minute, second=second)
+
+        if time_frame == constants.time_frame_s1:
+            s = part_count % (3.5 * 3600)
+            d = part_count // (3.5 * 3600)
+            if r - datetime.timedelta(seconds=s) < datetime.datetime(year=year, month=month, day=day,
+                                                                     hour=9, minute=0, second=0):
+                ts = (d * 24 + 20.5) * 3600 + s
+            else:
+                ts = d * 24 * 3600 + s
+
+            r -= datetime.timedelta(seconds=ts)
+            return r
+
+        elif time_frame == constants.time_frame_m1:
+            s = part_count % (3.5 * 60)
+            d = part_count // (3.5 * 60)
+            if r - datetime.timedelta(minutes=s) < datetime.datetime(year=year, month=month, day=day,
+                                                                     hour=9, minute=0, second=0):
+                ts = (d * 24 + 20.5) * 60 + s
+            else:
+                ts = d * 24 * 60 + s
+
+            r -= datetime.timedelta(minutes=ts)
+            return r
+
+        elif time_frame == constants.time_frame_h1:
+            s = part_count % 4
+            d = part_count // 4
+            print(s)
+            print(d)
+            if r - datetime.timedelta(hours=s) < datetime.datetime(year=year, month=month, day=day,
+                                                                   hour=9, minute=0, second=0):
+                ts = (d * 24 + 20) + s
+            else:
+                ts = d * 24 + s
+
+            r -= datetime.timedelta(hours=ts)
+            return r
+
+        elif time_frame == constants.time_frame_d1:
+            r -= datetime.timedelta(days=part_count)
+            return r
+
+        elif time_frame == constants.time_frame_mn1:
+            r -= datetime.timedelta(days=30 * part_count)
+            return r
+
+        elif time_frame == constants.time_frame_y1:
+            r -= datetime.timedelta(days=365 * part_count)
+            return r
+
+
+    def __load_over_data(self, candle_index, candle_count):
+        error = None
+        res = True
+
+        if self.no_any_data is True:
+            error = 'no any data'
+            return res, error
+
+        end_date = self.candle_date_list[-1]
+        i=0
+        while candle_index + 1 + candle_count > len(self.candle_date_list):
+            coeff = 2**i
+            # need load any data
+            now_candle_count = coeff * (candle_index + 1 + candle_count - len(self.candle_date_list))
+            # self.print_c(now_candle_count)
+
+            start_date = self.__get_time(end_date, now_candle_count, self.time_frame)
+            add, add_error = self.db.get_share_second_data(self.en_symbol_12_digit_code, start_date, end_date)
+            if add_error is not None:
+                error = add_error
+                res = False
+                return res, error
+            self.all_raw_second_data = self.all_raw_second_data + add
+            self.candle_date_list, candle_date_list_error = self.__get_candle_date_list(self.time_frame)
+            if candle_date_list_error is not None:
+                error = candle_date_list_error
+                res = False
+                return res, error
+            self.max_candle = len(self.candle_date_list)
+
+            have_any_data , have_any_data_error = self.db.have_any_data(
+                self.en_symbol_12_digit_code, self.candle_date_list[-1])
+            if have_any_data_error is not None:
+                error = add_error
+                res = False
+                return res, error
+
+            if have_any_data is False:
+                self.no_any_data = True
+                error = 'no any data'
+                res = True
+                break
+
+            end_date = start_date
+            i += 1
+
+        return res, error
 
     # ---------------------------------
 
@@ -339,21 +455,23 @@ def max_profit(data):
             step_np[i + 1] = 0
 
 
+
+
+
 if __name__ == '__main__':
     import time
-
     start = time.time()
 
     from database_info import get_database_info, laptop_local_access
     database_info = get_database_info(laptop_local_access, 'bourse_analyze_server_0.1')
     en_symbol_12_digit_code = 'IRO1ABDI0001'
     start_date_time = 20081215114810
-    # start_date_time = 20130211114810
+    start_date_time = 20190702122959
     today_date_time = 20190703122950
-    time_frame = 'D1'
+    time_frame = 'S1'
     data_type = constants.data_type_close
     adjust_today_candle = constants.adjust_today_candle_this_time
-    adjusted_type = constants.adjusted_type_capital_increase
+    adjusted_type = constants.adjusted_type_all
     data_count = 0
     log_obj = None
 
@@ -364,13 +482,17 @@ if __name__ == '__main__':
                       data_type=data_type, adjust_today_candle=adjust_today_candle, adjusted_type=adjusted_type,
                       data_count=data_count, log_obj=log_obj)
 
-    # a.colored_print.print(text='aa')
+    a.colored_print.print(text='aa')
     for j in range(1):
         # print(j)
-        for i in range(100):
+        for i in range(1):
             print(i + 1000 * j)
             b = a.get_data(candle_index=i, candle_count=500)
 
-    # a.colored_print.print(text='aa', color='green')
-            print(b[0:2, :])
+            #print(b[0:2, :])
+            print(b)
+            print(b.shape)
+            print(a.no_any_data)
+
+
     print(time.time() - start)
