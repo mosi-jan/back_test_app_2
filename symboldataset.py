@@ -284,27 +284,46 @@ class SymbolDataSet:
 
     # ---------------------------------
     def __grow_time_frame_data(self, candle_index, candle_count):
+        if self.no_any_data is True:
+            return 'no any data'
 
-        while candle_index + 1 + candle_count > self.time_frame_data.shape[0]:
-            today_date_time = self.time_frame_data[-1, 0]
-            candle_needed = candle_index + candle_count - self.time_frame_data.shape[0] + 1
-            start_date_time = self.estimate_time(base_time=today_date_time,
-                                                 part_count=candle_needed,
+        today_date_time = self.time_frame_data[-1, 0]
+
+        if self.time_frame == constants.time_frame_s1:
+            coeff = 2
+        elif self.time_frame == constants.time_frame_m1:
+            coeff = 1
+        else:
+            coeff = 0
+
+        while candle_index + candle_count > self.time_frame_data.shape[0]:
+            candle_needed = candle_index + candle_count - self.time_frame_data.shape[0]
+            print(candle_needed)
+            start_date_time = self.estimate_time(base_time=today_date_time, part_count=candle_needed * (2 ** coeff),
                                                  time_frame=self.time_frame)
 
             second_date, error = self.db.get_second_data_for_grow(en_symbol_12_digit_code=self.en_symbol_12_digit_code,
                                                                   start_date=start_date_time,
                                                                   end_date=today_date_time)
+            today_date_time = start_date_time
             if error is not None:
-                self.init_error = True
-                return
-
-            if len(second_date) == 0:
-                self.no_any_data = True
-                return
-
+                # self.init_error = True
+                return error
             # self.time_frame_data = np.array(self.__second_to_time_frame(second_date))
-            np.vstack((self.time_frame_data, np.array(self.__second_to_time_frame(second_date))))
+
+            if len(second_date) > 0:
+                self.time_frame_data = np.vstack((self.time_frame_data, np.array(self.__second_to_time_frame(second_date))))
+            coeff += 1
+
+            have_data, error = self.db.have_any_data(en_symbol_12_digit_code=en_symbol_12_digit_code,
+                                                     date_time=start_date_time)
+            if error is not None:
+                return error
+            if have_data is False:
+                self.no_any_data = True
+                return 'no_any_data'
+
+        return None
 
     def estimate_time(self, base_time, part_count, time_frame):
         import datetime
@@ -314,11 +333,13 @@ class SymbolDataSet:
         day = int(base_time / 1000000) % 100
         month = int(base_time / 100000000) % 100
         year = int(base_time / 10000000000) % 10000
+
         r = datetime.datetime(year=year, month=month, day=day, hour=hour, minute=minute, second=second)
 
         if time_frame == constants.time_frame_s1:
             s = part_count % (3.5 * 3600)
             d = part_count // (3.5 * 3600)
+
             if r - datetime.timedelta(seconds=s) < datetime.datetime(year=year, month=month, day=day,
                                                                      hour=9, minute=0, second=0):
                 ts = (d * 24 + 20.5) * 3600 + s
@@ -326,11 +347,12 @@ class SymbolDataSet:
                 ts = d * 24 * 3600 + s
 
             r -= datetime.timedelta(seconds=ts)
-            return r
+            #return r
 
         elif time_frame == constants.time_frame_m1:
             s = part_count % (3.5 * 60)
             d = part_count // (3.5 * 60)
+
             if r - datetime.timedelta(minutes=s) < datetime.datetime(year=year, month=month, day=day,
                                                                      hour=9, minute=0, second=0):
                 ts = (d * 24 + 20.5) * 60 + s
@@ -338,82 +360,35 @@ class SymbolDataSet:
                 ts = d * 24 * 60 + s
 
             r -= datetime.timedelta(minutes=ts)
-            return r
+            #return r
 
         elif time_frame == constants.time_frame_h1:
-            s = part_count % 4
-            d = part_count // 4
+            s = part_count % (4 * 1)
+            d = part_count // (4 * 1)
             print(s)
             print(d)
             if r - datetime.timedelta(hours=s) < datetime.datetime(year=year, month=month, day=day,
                                                                    hour=9, minute=0, second=0):
-                ts = (d * 24 + 20) + s
+                ts = (d * 24 + 20) * 1 + s
             else:
-                ts = d * 24 + s
+                ts = d * 24 * 1 + s
 
             r -= datetime.timedelta(hours=ts)
-            return r
+            #return r
 
         elif time_frame == constants.time_frame_d1:
             r -= datetime.timedelta(days=part_count)
-            return r
+            #return r
 
         elif time_frame == constants.time_frame_mn1:
             r -= datetime.timedelta(days=30 * part_count)
-            return r
+            #return r
 
         elif time_frame == constants.time_frame_y1:
             r -= datetime.timedelta(days=365 * part_count)
-            return r
+            #return r
 
-
-    def __load_over_data(self, candle_index, candle_count):
-        error = None
-        res = True
-
-        if self.no_any_data is True:
-            error = 'no any data'
-            return res, error
-
-        end_date = self.candle_date_list[-1]
-        i=0
-        while candle_index + 1 + candle_count > len(self.candle_date_list):
-            coeff = 2**i
-            # need load any data
-            now_candle_count = coeff * (candle_index + 1 + candle_count - len(self.candle_date_list))
-            # self.print_c(now_candle_count)
-
-            start_date = self.__get_time(end_date, now_candle_count, self.time_frame)
-            add, add_error = self.db.get_share_second_data(self.en_symbol_12_digit_code, start_date, end_date)
-            if add_error is not None:
-                error = add_error
-                res = False
-                return res, error
-            self.all_raw_second_data = self.all_raw_second_data + add
-            self.candle_date_list, candle_date_list_error = self.__get_candle_date_list(self.time_frame)
-            if candle_date_list_error is not None:
-                error = candle_date_list_error
-                res = False
-                return res, error
-            self.max_candle = len(self.candle_date_list)
-
-            have_any_data , have_any_data_error = self.db.have_any_data(
-                self.en_symbol_12_digit_code, self.candle_date_list[-1])
-            if have_any_data_error is not None:
-                error = add_error
-                res = False
-                return res, error
-
-            if have_any_data is False:
-                self.no_any_data = True
-                error = 'no any data'
-                res = True
-                break
-
-            end_date = start_date
-            i += 1
-
-        return res, error
+        return r.second + r.minute * 100 + r.hour * 10000 + r.day * 1000000 + r.month * 100000000 + r.year * 10000000000
 
     # ---------------------------------
 
@@ -466,7 +441,7 @@ if __name__ == '__main__':
     database_info = get_database_info(laptop_local_access, 'bourse_analyze_server_0.1')
     en_symbol_12_digit_code = 'IRO1ABDI0001'
     start_date_time = 20081215114810
-    start_date_time = 20190702122959
+    start_date_time = 20190702122950
     today_date_time = 20190703122950
     time_frame = 'S1'
     data_type = constants.data_type_close
@@ -482,17 +457,23 @@ if __name__ == '__main__':
                       data_type=data_type, adjust_today_candle=adjust_today_candle, adjusted_type=adjusted_type,
                       data_count=data_count, log_obj=log_obj)
 
-    a.colored_print.print(text='aa')
+    # a.colored_print.print(text='aa')
     for j in range(1):
         # print(j)
-        for i in range(1):
+        for i in range(100):
             print(i + 1000 * j)
-            b = a.get_data(candle_index=i, candle_count=500)
+            b = a.get_data(candle_index=i, candle_count=500000)
 
+    # a.colored_print.print(text='aa', color='green')
             #print(b[0:2, :])
-            print(b)
+            #print(b)
             print(b.shape)
             print(a.no_any_data)
 
+    #t = 20190703090001
+    #r = estimate_time(t, 1*1*1 +10, 'Y1')
+    #print('--------')
+    #print(t)
+    #print(r)
 
     print(time.time() - start)

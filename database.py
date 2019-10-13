@@ -176,7 +176,6 @@ class DataBase:
         query = 'select {0} from {1} where en_symbol_12_digit_code = %s and date_time <= {2} and date_time > {3} order by {4} desc'\
             .format(fields, 'share_second_data', end_date, start_date, 'date_time')
         args = en_symbol_12_digit_code
-        print(query)
         return self.select_query(query=query, args=args, fetchall=True, write_log=True)
 
     def get_second_data_for_grow(self, en_symbol_12_digit_code, start_date, end_date):
@@ -185,9 +184,21 @@ class DataBase:
         query = 'select {0} from {1} where en_symbol_12_digit_code = %s and date_time < {2} and date_time >= {3} order by {4} desc'\
             .format(fields, 'share_second_data', end_date, start_date, 'date_time')
         args = en_symbol_12_digit_code
-        print(query)
         return self.select_query(query=query, args=args, fetchall=True, write_log=True)
 
+    def have_any_data(self, en_symbol_12_digit_code, date_time):
+        query = 'select count(*) from share_second_data ' \
+                'where en_symbol_12_digit_code = %s and date_time < %s'
+
+        args = (en_symbol_12_digit_code, date_time)
+        res, error = self.select_query(query, args)
+        if error is not None:
+            return None, error
+
+        if res[0][0] > 0:
+            return True, None
+        else:
+            return False, None
 
     def get_adjusted_data(self, en_symbol_12_digit_code, adjust_type):
         if adjust_type == constants.adjusted_type_none:
