@@ -3,7 +3,7 @@ from Log import Logging
 import constants
 
 
-class DataBase:
+class BaseDB:
     def __init__(self, db_info, log_obj=None):
         try:
             if log_obj is None:
@@ -168,7 +168,11 @@ class DataBase:
                     con.close()
             finally:
                 return False, 'SQL ERROR:{0} query:{1} args:{2}'.format(str(e), query, args)
-    # --------------------------------------------------------------
+
+
+class SymbolDataSetDB(BaseDB):
+    def __init__(self, db_info, log_obj=None):
+        BaseDB.__init__(self, db_info, log_obj)
 
     def get_second_data(self, en_symbol_12_digit_code, start_date, end_date):
         # date_time, open_price, high_price, low_price, close_price, trade_count, trade_volume, trade_value

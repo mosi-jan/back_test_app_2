@@ -1,8 +1,10 @@
 from Log import Logging
 from my_lib import PrintColored
-from database import DataBase
+from database import SymbolDataSetDB
 import numpy as np
 import constants
+
+from global_settind import sell_wage, buy_wage
 
 
 class SymbolDataSet:
@@ -16,7 +18,7 @@ class SymbolDataSet:
             self.log.logConfig(account_id=database_info['db_username'])
         else:
             self.log = log_obj
-        self.db = DataBase(database_info, self.log)
+        self.db = SymbolDataSetDB(database_info, self.log)
 
         self.en_symbol_12_digit_code = en_symbol_12_digit_code
         self.start_date_time = start_date_time
@@ -38,144 +40,6 @@ class SymbolDataSet:
 
         self.last_adjusted_type = None
         self.adjusted_data = list()
-
-    def __load_init_data(self):
-        # load time_frame_data ------------------------------------
-        second_date, error = self.db.get_second_data(en_symbol_12_digit_code=self.en_symbol_12_digit_code,
-                                                     start_date=self.start_date_time, end_date=self.today_date_time)
-        if error is not None:
-            self.init_error = True
-            return
-        self.time_frame_data = np.array(self.__second_to_time_frame(second_date))
-        self.origin_candle_count = self.time_frame_data.shape[0]
-
-        # load adjusted_data ------------------------------------
-        # do_data, coefficient, adjusted_type, old_data, new_data
-        all_adjusted_data, error = self.db.get_all_adjusted_data(en_symbol_12_digit_code=self.en_symbol_12_digit_code)
-        if error is not None:
-            self.init_error = True
-            return
-
-        # do_data, coefficient, adjusted_type, old_data, new_data
-        self.all_adjusted_data = all_adjusted_data
-
-    def __second_to_time_frame(self, second_data):
-        date_time, open_price, high_price, low_price, close_price, trade_count, trade_volume, trade_value = range(8)
-
-        time_series = list()
-        source = second_data
-        if len(source) > 0:
-            open = 0
-            close = 0
-            high = 0
-            low = 0
-            count = 0
-            volume = 0
-            value = 0
-            start_p1 = 0
-            start_time_date = 0
-
-            start = True
-
-            for item in source:
-                p1 = 0
-                p1_time = p1
-
-                if self.time_frame == 'S1':
-                    p1 = item[date_time]
-                    p1_time = p1
-
-                elif self.time_frame == 'M1':
-                    p1 = int(item[date_time] / 100)
-                    p1_time = p1 * 100
-
-                elif self.time_frame == 'H1':
-                    p1 = int(item[date_time] / 10000)
-                    p1_time = p1 * 10000
-
-                elif self.time_frame == 'D1':
-                    p1 = int(item[date_time] / 1000000)
-                    p1_time = p1 * 1000000
-
-                elif self.time_frame == 'MN1':
-                    p1 = int(item[date_time] / 100000000)
-                    # p1_time = (p1 * 100 + 1) * 1000000
-                    p1_time = p1 * 100000000 + 1000000
-
-                elif self.time_frame == 'Y1':
-                    p1 = int(item[date_time] / 10000000000)
-                    p1_time = p1 * 10000000000
-
-                if start is True:
-                    start = False
-                    open = item[open_price]
-                    close = item[close_price]
-                    high = item[high_price]
-                    low = item[low_price]
-                    volume = 0
-                    value = 0
-                    count = 0
-                    start_p1 = p1
-                    start_time_date = p1_time
-
-                if p1 == start_p1:
-                    open = item[open_price]
-
-                    if item[low_price] < low:
-                        low = item[low_price]
-
-                    if item[high_price] > high:
-                        high = item[high_price]
-
-                    count += item[trade_count]
-                    volume += item[trade_volume]
-                    value += item[trade_value]
-
-                else:
-                    # end = round(float(value) / volume)
-                    time_series.append([start_time_date, int(open), int(high), int(low), int(close),
-                                        volume, value, count])
-
-                    open = item[open_price]
-                    close = item[close_price]
-                    high = item[high_price]
-                    low = item[low_price]
-                    count = item[trade_count]
-                    volume = item[trade_volume]
-                    value = item[trade_value]
-
-                    start_p1 = p1
-                    start_time_date = p1_time
-
-            if volume != 0:
-                # end = round(float(value) / volume)
-                time_series.append([start_time_date, int(open), int(high), int(low), int(close), volume, value, count])
-
-        return time_series
-
-    @staticmethod
-    def __find_index(np_array, item, past_day=True):
-        start = 0
-        end = np_array.shape[0] - 1
-        while True:
-            mid = (start + end) // 2
-
-            if np_array[mid] == item:
-                return mid
-
-            elif np_array[mid] > item:
-                # end = mid -1
-                start = mid + 1
-
-            elif np_array[mid] < item:
-                # start = mid + 1
-                end = mid - 1
-
-            if start > end:
-                if past_day:
-                    return start
-                else:
-                    return end
 
     def get_data(self, candle_index, candle_count, adjust_today_candle=None, adjusted_type=None):
         time_series = list()
@@ -272,22 +136,6 @@ class SymbolDataSet:
 
         return coeff[:, 1]
 
-    def get_adjusted_data(self, adjusted_type):
-        if self.last_adjusted_type != adjusted_type:
-            if adjusted_type == constants.adjusted_type_all:
-                adj = (constants.adjusted_type_capital_increase, constants.adjusted_type_take_profit)
-            else:
-                adj = (adjusted_type,)
-
-            self.adjusted_data = list()
-
-            for item in self.all_adjusted_data:
-                if item[2] in adj:
-                    self.adjusted_data.append([item[0], item[1]])
-            self.last_adjusted_type = adjusted_type
-
-        return self.adjusted_data
-
     def get_adjusted_function_list(self, candle_index, candle_count):
         self.__grow_time_frame_data(candle_index, candle_count)
 
@@ -318,30 +166,28 @@ class SymbolDataSet:
 
         return coeff
 
-    def get_max_profit_data(self, candle_index, candle_count):
-        # [date, a, b]
-        adj = self.get_adjusted_function_list(candle_index, candle_count)
-        a = self.get_data(candle_index=candle_index, candle_count=candle_count,
-                          adjust_today_candle=constants.adjust_today_candle_all_time,
-                          adjusted_type=constants.adjusted_type_none)
+    def get_adjusted_data(self, adjusted_type):
+        if self.last_adjusted_type != adjusted_type:
+            if adjusted_type == constants.adjusted_type_all:
+                adj = (constants.adjusted_type_capital_increase, constants.adjusted_type_take_profit)
+            else:
+                adj = (adjusted_type,)
 
-        b = self.get_data(candle_index=candle_index, candle_count=candle_count,
-                          adjust_today_candle=constants.adjust_today_candle_all_time,
-                          adjusted_type=constants.adjusted_type_all)
+            self.adjusted_data = list()
 
-        res = np.zeros((adj.shape[0], 7))
-        res[:, 0:3] = adj
-        res[:, 3] = a[:, 1]
-        res[:, 4] = b[:, 1]
+            for item in self.all_adjusted_data:
+                if item[2] in adj:
+                    self.adjusted_data.append([item[0], item[1]])
+            self.last_adjusted_type = adjusted_type
 
-        return res
+        return self.adjusted_data
 
     def max_profit(self, candle_index, candle_count):
-        data = self.get_max_profit_data(candle_index, candle_count)
+        data = self.__get_max_profit_data(candle_index, candle_count)
         d_time, a, b, no_adjust, adjusted, extremum_type, price = range(7)
 
-        buy_wage = 1 + 0.005
-        sell_wage = 1 - 0.01
+        # buy_wage = 1 + 0.005
+        # sell_wage = 1 - 0.01
 
         # find extremum points
         data_count = data.shape[0]
@@ -476,6 +322,120 @@ class SymbolDataSet:
         return data, order, coeff
 
     # ---------------------------------
+    def __load_init_data(self):
+        # load time_frame_data ------------------------------------
+        second_date, error = self.db.get_second_data(en_symbol_12_digit_code=self.en_symbol_12_digit_code,
+                                                     start_date=self.start_date_time, end_date=self.today_date_time)
+        if error is not None:
+            self.init_error = True
+            return
+        self.time_frame_data = np.array(self.__second_to_time_frame(second_date))
+        self.origin_candle_count = self.time_frame_data.shape[0]
+
+        # load adjusted_data ------------------------------------
+        # do_data, coefficient, adjusted_type, old_data, new_data
+        all_adjusted_data, error = self.db.get_all_adjusted_data(en_symbol_12_digit_code=self.en_symbol_12_digit_code)
+        if error is not None:
+            self.init_error = True
+            return
+
+        # do_data, coefficient, adjusted_type, old_data, new_data
+        self.all_adjusted_data = all_adjusted_data
+
+    def __second_to_time_frame(self, second_data):
+        date_time, open_price, high_price, low_price, close_price, trade_count, trade_volume, trade_value = range(8)
+
+        time_series = list()
+        source = second_data
+        if len(source) > 0:
+            open = 0
+            close = 0
+            high = 0
+            low = 0
+            count = 0
+            volume = 0
+            value = 0
+            start_p1 = 0
+            start_time_date = 0
+
+            start = True
+
+            for item in source:
+                p1 = 0
+                p1_time = p1
+
+                if self.time_frame == 'S1':
+                    p1 = item[date_time]
+                    p1_time = p1
+
+                elif self.time_frame == 'M1':
+                    p1 = int(item[date_time] / 100)
+                    p1_time = p1 * 100
+
+                elif self.time_frame == 'H1':
+                    p1 = int(item[date_time] / 10000)
+                    p1_time = p1 * 10000
+
+                elif self.time_frame == 'D1':
+                    p1 = int(item[date_time] / 1000000)
+                    p1_time = p1 * 1000000
+
+                elif self.time_frame == 'MN1':
+                    p1 = int(item[date_time] / 100000000)
+                    # p1_time = (p1 * 100 + 1) * 1000000
+                    p1_time = p1 * 100000000 + 1000000
+
+                elif self.time_frame == 'Y1':
+                    p1 = int(item[date_time] / 10000000000)
+                    p1_time = p1 * 10000000000
+
+                if start is True:
+                    start = False
+                    open = item[open_price]
+                    close = item[close_price]
+                    high = item[high_price]
+                    low = item[low_price]
+                    volume = 0
+                    value = 0
+                    count = 0
+                    start_p1 = p1
+                    start_time_date = p1_time
+
+                if p1 == start_p1:
+                    open = item[open_price]
+
+                    if item[low_price] < low:
+                        low = item[low_price]
+
+                    if item[high_price] > high:
+                        high = item[high_price]
+
+                    count += item[trade_count]
+                    volume += item[trade_volume]
+                    value += item[trade_value]
+
+                else:
+                    # end = round(float(value) / volume)
+                    time_series.append([start_time_date, int(open), int(high), int(low), int(close),
+                                        volume, value, count])
+
+                    open = item[open_price]
+                    close = item[close_price]
+                    high = item[high_price]
+                    low = item[low_price]
+                    count = item[trade_count]
+                    volume = item[trade_volume]
+                    value = item[trade_value]
+
+                    start_p1 = p1
+                    start_time_date = p1_time
+
+            if volume != 0:
+                # end = round(float(value) / volume)
+                time_series.append([start_time_date, int(open), int(high), int(low), int(close), volume, value, count])
+
+        return time_series
+
     def __grow_time_frame_data(self, candle_index, candle_count):
         if self.no_any_data is True:
             return 'no any data'
@@ -492,8 +452,8 @@ class SymbolDataSet:
         while candle_index + candle_count > self.time_frame_data.shape[0]:
             candle_needed = candle_index + candle_count - self.time_frame_data.shape[0]
             # print(candle_needed)
-            start_date_time = self.estimate_time(base_time=today_date_time, part_count=candle_needed * (2 ** coeff),
-                                                 time_frame=self.time_frame)
+            start_date_time = self.__estimate_time(base_time=today_date_time, part_count=candle_needed * (2 ** coeff),
+                                                   time_frame=self.time_frame)
 
             second_date, error = self.db.get_second_data_for_grow(en_symbol_12_digit_code=self.en_symbol_12_digit_code,
                                                                   start_date=start_date_time,
@@ -519,8 +479,26 @@ class SymbolDataSet:
 
         return None
 
+    def __get_max_profit_data(self, candle_index, candle_count):
+        # [date, a, b]
+        adj = self.get_adjusted_function_list(candle_index, candle_count)
+        no_adjust_price = self.get_data(candle_index=candle_index, candle_count=candle_count,
+                                        adjust_today_candle=constants.adjust_today_candle_all_time,
+                                        adjusted_type=constants.adjusted_type_none)
+
+        adjusted_price = self.get_data(candle_index=candle_index, candle_count=candle_count,
+                                       adjust_today_candle=constants.adjust_today_candle_all_time,
+                                       adjusted_type=constants.adjusted_type_all)
+
+        res = np.zeros((adj.shape[0], 7))
+        res[:, 0:3] = adj
+        res[:, 3] = no_adjust_price[:, 1]
+        res[:, 4] = adjusted_price[:, 1]
+
+        return res
+
     @staticmethod
-    def estimate_time(base_time, part_count, time_frame):
+    def __estimate_time(base_time, part_count, time_frame):
         import datetime
         second = base_time % 100
         minute = int(base_time / 100) % 100
@@ -579,6 +557,30 @@ class SymbolDataSet:
 
         return r.second + r.minute * 100 + r.hour * 10000 + r.day * 1000000 + r.month * 100000000 + r.year * 10000000000
 
+    @staticmethod
+    def __find_index(np_array, item, past_day=True):
+        start = 0
+        end = np_array.shape[0] - 1
+        while True:
+            mid = (start + end) // 2
+
+            if np_array[mid] == item:
+                return mid
+
+            elif np_array[mid] > item:
+                # end = mid -1
+                start = mid + 1
+
+            elif np_array[mid] < item:
+                # start = mid + 1
+                end = mid - 1
+
+            if start > end:
+                if past_day:
+                    return start
+                else:
+                    return end
+
     # ---------------------------------
 
 
@@ -630,7 +632,7 @@ if __name__ == '__main__':
     # start_date_time = 20081215114810
     start_date_time = 20180702122950
     today_date_time = 20190703122950
-    time_frame = 'MN1'
+    time_frame = 'D1'
     data_type = constants.data_type_close
     adjust_today_candle = constants.adjust_today_candle_this_time
     adjusted_type = constants.adjusted_type_all
@@ -646,7 +648,7 @@ if __name__ == '__main__':
 
     # print(a.get_adjusted_function_list(0, 100))
     print('---------------------')
-    # print(a.get_max_profit_data(0, 100))
+    # print(a.__get_max_profit_data(0, 100))
     print('---------------------')
     data, orders, max_profit = a.max_profit(0, a.origin_candle_count)
     print(data)
@@ -666,19 +668,19 @@ if __name__ == '__main__':
 
     # a.colored_print.print(text='aa')
     # for j in range(1):
-        # print(j)
+    #    print(j)
     #    for i in range(100):
     #        print(i + 1000 * j)
     #        b = a.get_data(candle_index=i, candle_count=75600)
 
     # a.colored_print.print(text='aa', color='green')
-            # print(b[0:2, :])
-            # print(b)
+    #        print(b[0:2, :])
+    #        print(b)
     #        print(b.shape)
     #        print(a.no_any_data)
 
     # t = 20190703090001
-    # r = estimate_time(t, 1*1*1 +10, 'Y1')
+    # r = __estimate_time(t, 1*1*1 +10, 'Y1')
     # print('--------')
     # print(t)
     # print(r)
