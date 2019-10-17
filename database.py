@@ -2,6 +2,9 @@ from pymysql import connect, cursors
 from Log import Logging
 import constants
 
+# OrderDataSetDB
+from my_time import get_now_time_second
+
 
 class BaseDB:
     def __init__(self, db_info, log_obj=None):
@@ -234,3 +237,104 @@ class SymbolDataSetDB(BaseDB):
                 'where en_symbol_12_digit_code = %s order by do_data desc'
         args = en_symbol_12_digit_code
         return self.select_query(query=query, args=args, fetchall=True, write_log=True)
+
+
+
+class OrderDataSetDB(BaseDB):
+    def __init__(self, db_info, log_obj=None):
+        BaseDB.__init__(self, db_info, log_obj)
+
+    def get_new_order(self, order_run_time, write_log=True):
+        query = ''
+        args = ''
+        error = None
+        con = None
+        try:
+            con, err = self.get_connection()
+            if err is not None:
+                raise Exception(err)
+
+            db = con.cursor()
+            db._defer_warnings = True
+            db.autocommit = False
+
+            query = 'select * from waiting_order where expire_time < %s  order by add_time limit 0, 1'
+            args = (get_now_time_second())
+            db.execute(query, args)
+
+            order = db.fetchall()
+            if len(order) == 0:  # no any order
+                con.commit()
+                con.close()
+                return True, 'no any order'
+
+            order = order[0]
+
+            query = 'update waiting_order set expire_time=%s where order_id=%s'
+            args = (order_run_time + get_now_time_second(), order[0])  # order_id
+            db.execute(query, args)
+
+            con.commit()
+            con.close()
+            return order, error
+
+        except Exception as e:
+            if write_log is True:
+                self.log.error('get_new_order. error:{0} query:{1}, args:{2}'.format(e, query, args))
+            try:
+                if con.open is True:
+                    con.rollback()
+                    con.close()
+            finally:
+                return False, 'SQL ERROR: get_new_order: {0} query:{1} args:{2}'.format(str(e), query, args)
+
+    def exist_order(self, order_id):
+        query = 'select count(*) from waiting_order where order_id = %s'
+        args = (order_id)
+
+        res, err = self.select_query(query=query, args=args, fetchall=True, write_log=True)
+        if err is None:
+            if res[0][0] > 0:
+                return True
+            else:
+                return False
+        return err
+
+    def exist_sub_order_result(self, order_id, en_symbol_12_digit_code):
+        query = 'select count(*) from sub_order_result where order_id = %s and symbol=%s'
+        args = (order_id, en_symbol_12_digit_code)
+
+        res, err = self.select_query(query=query, args=args, fetchall=True, write_log=True)
+        if err is None:
+            if res[0][0] > 0:
+                return True
+            else:
+                return False
+        return err
+
+    def get_all_sub_result(self, order_id):
+        query = 'select symbol, result, start_time, run_time from sub_order_result where order_id = %s order by symbol'
+
+        args = (order_id)
+
+        return self.select_query(query=query, args=args, fetchall=True, write_log=True)
+
+    def remove_order(self, order_id):
+        query = 'delete from waiting_order where order_id=%s'
+        args = (order_id)
+
+        return self.command_query(query, args, True)
+
+    def clean_sub_order_result(self, order_id):
+        query = 'delete from sub_order_result where order_id=%s'
+        args = (order_id)
+
+        return self.command_query(query, args, True)
+
+    def insert_web_order_result(self, order_id, username, input_param, result, start_time, order_run_time, sum_run_time):
+        query = 'insert IGNORE into back_test_order_result (order_id, username, input_param, result, start_time, order_runtime, sum_runtime) ' \
+                'values (%s, %s, %s, %s, %s, %s, %s)'
+        args = (order_id, username, input_param, result, start_time, order_run_time, sum_run_time)
+
+        return self.command_query(query, args, True)
+
