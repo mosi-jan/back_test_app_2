@@ -180,7 +180,8 @@ class SymbolDataSetDB(BaseDB):
     def get_second_data(self, en_symbol_12_digit_code, start_date, end_date):
         # date_time, open_price, high_price, low_price, close_price, trade_count, trade_volume, trade_value
         fields = ' date_time, open_price, high_price, low_price, close_price, trade_count, trade_volume, trade_value '
-        query = 'select {0} from {1} where en_symbol_12_digit_code = %s and date_time <= {2} and date_time > {3} order by {4} desc'\
+        query = 'select {0} from {1} ' \
+                'where en_symbol_12_digit_code = %s and date_time <= {2} and date_time > {3} order by {4} desc'\
             .format(fields, 'share_second_data', end_date, start_date, 'date_time')
         args = en_symbol_12_digit_code
         return self.select_query(query=query, args=args, fetchall=True, write_log=True)
@@ -188,7 +189,8 @@ class SymbolDataSetDB(BaseDB):
     def get_second_data_for_grow(self, en_symbol_12_digit_code, start_date, end_date):
         # date_time, open_price, high_price, low_price, close_price, trade_count, trade_volume, trade_value
         fields = ' date_time, open_price, high_price, low_price, close_price, trade_count, trade_volume, trade_value '
-        query = 'select {0} from {1} where en_symbol_12_digit_code = %s and date_time < {2} and date_time >= {3} order by {4} desc'\
+        query = 'select {0} from {1} ' \
+                'where en_symbol_12_digit_code = %s and date_time < {2} and date_time >= {3} order by {4} desc'\
             .format(fields, 'share_second_data', end_date, start_date, 'date_time')
         args = en_symbol_12_digit_code
         return self.select_query(query=query, args=args, fetchall=True, write_log=True)
@@ -237,7 +239,6 @@ class SymbolDataSetDB(BaseDB):
                 'where en_symbol_12_digit_code = %s order by do_data desc'
         args = en_symbol_12_digit_code
         return self.select_query(query=query, args=args, fetchall=True, write_log=True)
-
 
 
 class OrderDataSetDB(BaseDB):
@@ -331,10 +332,11 @@ class OrderDataSetDB(BaseDB):
 
         return self.command_query(query, args, True)
 
-    def insert_web_order_result(self, order_id, username, input_param, result, start_time, order_run_time, sum_run_time):
-        query = 'insert IGNORE into back_test_order_result (order_id, username, input_param, result, start_time, order_runtime, sum_runtime) ' \
+    def insert_web_order_result(self, order_id, username, input_param, result,
+                                start_time, order_run_time, sum_run_time):
+        query = 'insert IGNORE into back_test_order_result ' \
+                '(order_id, username, input_param, result, start_time, order_runtime, sum_runtime) ' \
                 'values (%s, %s, %s, %s, %s, %s, %s)'
         args = (order_id, username, input_param, result, start_time, order_run_time, sum_run_time)
 
         return self.command_query(query, args, True)
-

@@ -45,7 +45,7 @@ class StrategyThread(threading.Thread):
         self.killed = True
 
     def process(self):
-        #self.print_c.print('running thread {0}'.format(threading.current_thread().getName()))
+        # self.print_c.print('running thread {0}'.format(threading.current_thread().getName()))
         sleep(2)
         # run strategy
         return True
@@ -53,9 +53,9 @@ class StrategyThread(threading.Thread):
     def run(self):
         sys.settrace(self.globaltrace)
 
-        #self.print_c.print('start thread {0}'.format(threading.current_thread().getName()))
+        # self.print_c.print('start thread {0}'.format(threading.current_thread().getName()))
         result = self.process()
-        #self.print_c.print('finished thread {0}'.format(threading.current_thread().getName()))
+        # self.print_c.print('finished thread {0}'.format(threading.current_thread().getName()))
 
         return result
 
@@ -172,7 +172,7 @@ class RunOrder:
                         break
                     i += 1
                 elif i > 20:
-                    i =0
+                    i = 0
                 else:
                     i += 1
 
@@ -217,7 +217,6 @@ class RunOrder:
 
                     sleep(0.01)
 
-
             if break_order is True:
                 # terminate all thread
                 self.terminate_all()
@@ -252,8 +251,8 @@ class RunOrder:
             # symbol, result, start_time, run_time
             if err is not None:
                 # go to run nex order
-                error = err
-                result = False
+                # error = err
+                # result = False
                 self.print_c.print('{0}: error: {1}'.format(self.process_name, err))
                 continue
 
@@ -286,31 +285,33 @@ class RunOrder:
                     opt_item = ast.literal_eval(item[1])
                     opt.append(opt_item)
                 # self.print_c('2')
-                error = None
+                # error = None
                 result = opt
                 # insert result on database
                 order_run_time = end_time - start_time
                 res, err = self.web_db.insert_web_order_result(order_id=order_id,
-                                                             username=username,
-                                                             input_param=str(input_params),
-                                                             result=str(result),
-                                                             start_time=start_time,
-                                                             order_run_time=order_run_time,
-                                                             sum_run_time=sum_run_time)
+                                                               username=username,
+                                                               input_param=str(input_params),
+                                                               result=str(result),
+                                                               start_time=start_time,
+                                                               order_run_time=order_run_time,
+                                                               sum_run_time=sum_run_time)
                 if err is not None:
                     if self.get_status() in [server_status_stopping, server_status_shutting_down]:
                         self.print_c.print('{0}: cant insert output: error: {1}'.format(self.process_name, err))
                         self.print_c.print('{0}: shutting down'.format(self.process_name, err))
                         return
                     else:
-                        self.print_c.print('{0}: cant insert output: error: {1} --> wait 10 second'.format(self.process_name, err))
+                        self.print_c.print('{0}: cant insert output: error: {1} --> wait 10 second'
+                                           .format(self.process_name, err))
                         sleep(10)
                         self.set_status(server_status_sleeping)
                         continue
 
                 # remove order from waiting_order table
                 # self.web_db.remove_order(order_id)
-                self.print_c.print('{0}: finish run order: {1} : result: {2}'.format(self.process_name, order_id, result))
+                self.print_c.print('{0}: finish run order: {1} : result: {2}'
+                                   .format(self.process_name, order_id, result))
 
                 # remove sub order from sub_order_result table
                 if clean_sub_order_result is True:
@@ -352,8 +353,8 @@ class RunOrder:
         strategy_context = input_params['strategy_context']
 
         return order_id, username, input_params, adjusted_type, start_date_time, end_date_time, \
-               time_frame, order_total, order_same, data_type, accepted_symbol_list, output_format, \
-               strategy, current_strategy_name, strategy_variable, strategy_context
+            time_frame, order_total, order_same, data_type, accepted_symbol_list, output_format, \
+            strategy, current_strategy_name, strategy_variable, strategy_context
 
     @ staticmethod
     def pack_order(order_id, username, adjusted_type, start_date_time, end_date_time, time_frame,
@@ -383,14 +384,12 @@ class RunOrder:
         return order
 
 
-
 if __name__ == '__main__':
     from database_info import get_database_info, laptop_local_access
     database_info = get_database_info(laptop_local_access, 'bourse_web_order_0.1')
 
     server = RunOrder(web_database_info=database_info,
-                      order_run_time=100, max_worker=20,
+                      order_run_time=100, max_worker=2000,
                       p_name='server 1', log_obj=None)
-
 
     server.run()
