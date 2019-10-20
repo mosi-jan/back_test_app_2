@@ -5,6 +5,7 @@ import numpy as np
 import constants
 
 from global_settind import sell_wage, buy_wage
+from signal import Signal
 
 
 class SymbolDataSet:
@@ -42,7 +43,8 @@ class SymbolDataSet:
         self.adjusted_data = list()
 
     def get_data(self, candle_index, candle_count, adjust_today_candle=None, adjusted_type=None):
-        time_series = list()
+        if candle_count < 1:
+            return []
 
         if adjust_today_candle is None:
             adjust_today_candle = self.adjust_today_candle
@@ -50,24 +52,26 @@ class SymbolDataSet:
         if adjusted_type is None:
             adjusted_type = self.adjusted_type
 
-        if candle_count < 1:
-            res = time_series
-            return res, None
-
-        self.__grow_time_frame_data(candle_index, candle_count)
-
-        raw_data = self.get_raw_data_type(data_type=self.data_type,
-                                          candle_index=candle_index, candle_count=candle_count)
+        raw_data = self.get_raw_data(data_type=self.data_type, candle_index=candle_index, candle_count=candle_count)
 
         adjusted_list = self.get_adjusted_coefficient_list(adjust_today_candle, adjusted_type,
                                                            candle_index, candle_count)
 
         raw_data[:, 1] *= adjusted_list
-        raw_data = raw_data.astype(np.uint64)
+        # raw_data = raw_data.astype(np.uint64)
 
         return raw_data
 
-    def get_raw_data_type(self, data_type, candle_index, candle_count):
+    def get_origin_candle_count(self):
+        return self.original_candle_count
+
+    def get_raw_data(self, candle_index, candle_count, data_type=None):
+        if candle_count < 1:
+            return []
+
+        if data_type is None:
+            data_type = self.data_type
+
         self.__grow_time_frame_data(candle_index, candle_count)
         data = self.time_frame_data[candle_index:candle_index + candle_count]
 
@@ -137,34 +141,8 @@ class SymbolDataSet:
         return coeff[:, 1]
 
     def get_adjusted_function_list(self, candle_index, candle_count):
-        self.__grow_time_frame_data(candle_index, candle_count)
-
-        coeff = np.ones((self.time_frame_data[candle_index:candle_index + candle_count].shape[0], 3))  # [date, a, b]
-        coeff[:, 0] = self.time_frame_data[candle_index:candle_index + candle_count, 0]  # date
-        coeff[:, 2] *= 0  # b = 0
-
-        adj = self.all_adjusted_data[::-1]  # end to first
-        source_date = self.time_frame_data[0, 0]
-
-        for item in adj:
-            if item[0] * 1000000 > source_date or item[0] * 1000000 < coeff[-1, 0]:
-                continue
-
-            if item[2] == constants.adjusted_type_capital_increase:
-                a = item[4] / item[3]
-                b = 0
-            elif item[2] == constants.adjusted_type_take_profit:
-                a = 1
-                b = item[3] - item[4]
-            else:
-                a = 1
-                b = 0
-
-            coeff_index = self.__find_index(np_array=coeff[:, 0], item=item[0] * 1000000, past_day=False)
-            coeff[:coeff_index + 1, 1] *= a
-            coeff[:coeff_index + 1, 2] += coeff[coeff_index, 1] * b
-
-        return coeff
+        self.__update_adjusted_function_list(candle_index, candle_count)
+        return self.adjusted_function_list[candle_index: candle_index + candle_count]
 
     def get_adjusted_data(self, adjusted_type):
         if self.last_adjusted_type != adjusted_type:
@@ -186,41 +164,31 @@ class SymbolDataSet:
         data = self.__get_max_profit_data(candle_index, candle_count)
         d_time, a, b, no_adjust, adjusted, extremum_type, price = range(7)
 
-        # buy_wage = 1 + 0.005
-        # sell_wage = 1 - 0.01
-
         # find extremum points
         data_count = data.shape[0]
 
         if data_count > 1:
             if data[0, adjusted] > data[1, adjusted]:
-                # res.append([data[1], data[0]])
                 data[0, extremum_type] = 1
-                # extremum.append(data[0])
             if len(data) > 2:
                 for i in range(1, data_count - 1):
                     if data[i, adjusted] >= data[i - 1, adjusted] and data[i, adjusted] >= data[i + 1, adjusted]:
                         data[i, extremum_type] = 1
-                        # extremum.append(data[i])
 
                     elif data[i, adjusted] <= data[i - 1, adjusted] and data[i, adjusted] <= data[i + 1, adjusted]:
                         data[i, extremum_type] = -1
-                        # extremum.append(data[i])
 
             if data[-1, adjusted] < data[-2, adjusted]:
                 data[-1, extremum_type] = -1
-                # extremum.append(data[-1])
 
         else:
             pass
 
-        # data[:, 6] *= data[:, 2]
         for item in data:
             if item[extremum_type] == 1:
                 item[price] = item[a] * item[no_adjust] * sell_wage + item[b]
             elif item[extremum_type] == -1:
                 item[price] = item[a] * item[no_adjust] * buy_wage + item[b]
-        # data[:, 6] += data[:, 3]
 
         # ------------------------
         remove = True
@@ -289,37 +257,54 @@ class SymbolDataSet:
                 break
 
         # ------------------------
-        sell_p = None
-        sell_date = None
-        sell_no_adjust = None
+        # sell_p = None
+        # sell_date = None
+        # sell_no_adjust = None
 
-        coeff = 1
-        sell_flag = True
-        order = list()
-        order_time = 0
+        # coeff = 1
+        # sell_flag = True
+        # order = list()
+        # order_time = 0
+        # for i in range(data.shape[0]):
+        #     order_time += 1
+
+        #    if data[i, price] > 0:
+        #        if sell_flag is True:
+        #            sell_p = data[i, price]
+        #            sell_date = data[i, d_time]
+        #            sell_no_adjust = data[i, no_adjust]
+        #            sell_flag = False
+        #            order_time = 0
+
+        #        else:
+        #            c_p = sell_p / data[i, price]
+        #            coeff *= c_p
+        #            sell_flag = True
+
+        #            order.append([data[i, d_time], sell_date, data[i, no_adjust], sell_no_adjust, c_p, order_time])
+
+        # order = order[::-1]
+        # print(order)
+
+        sig = Signal(data_set=self)
+        # print(data.shape)
         for i in range(data.shape[0]):
-            order_time += 1
+            if data[i, extremum_type] == 1:  # sell
+                sig.sell(candle_index=i)
+            elif data[i, extremum_type] == -1:  # buy
+                sig.buy(candle_index=i)
 
-            if data[i, price] > 0:
-                if sell_flag is True:
-                    sell_p = data[i, price]
-                    sell_date = data[i, d_time]
-                    sell_no_adjust = data[i, no_adjust]
-                    sell_flag = False
-                    order_time = 0
+        order, coeff = sig.get_order(1, 1)
+        # print(order)
+        # print(coeff)
 
-                else:
-                    # buy_p = data[i, price]
-                    c_p = sell_p / data[i, price]
-                    coeff *= c_p
-                    sell_flag = True
-
-                    order.append([data[i, d_time], sell_date, data[i, no_adjust], sell_no_adjust, c_p, order_time])
-                    # print(c_p)
-                    # print(coeff)
-
-        print(order)
         return data, order, coeff
+
+    def get_candle_index(self, candle_date):
+        index = np.argwhere(self.time_frame_data[:, 0] == candle_date)
+        if index.shape[0] < 1:
+            return -1
+        return index[0, 0]
 
     # ---------------------------------
     def __load_init_data(self):
@@ -330,7 +315,7 @@ class SymbolDataSet:
             self.init_error = True
             return
         self.time_frame_data = np.array(self.__second_to_time_frame(second_date))
-        self.origin_candle_count = self.time_frame_data.shape[0]
+        self.original_candle_count = self.time_frame_data.shape[0]
 
         # load adjusted_data ------------------------------------
         # do_data, coefficient, adjusted_type, old_data, new_data
@@ -497,6 +482,38 @@ class SymbolDataSet:
 
         return res
 
+    def __update_adjusted_function_list(self, candle_index, candle_count):
+        self.__grow_time_frame_data(0, candle_index + candle_count)
+
+        # coeff = np.ones((self.time_frame_data[candle_index:candle_index + candle_count].shape[0], 3))  # [date, a, b]
+        coeff = np.ones((self.time_frame_data.shape[0], 3))  # [date, a, b]
+        coeff[:, 0] = self.time_frame_data[:, 0]  # date
+        coeff[:, 2] *= 0  # b = 0
+
+        adj = self.all_adjusted_data[::-1]  # end to first
+        source_date = self.time_frame_data[0, 0]
+
+        for item in adj:
+            if item[0] * 1000000 > source_date or item[0] * 1000000 < coeff[-1, 0]:
+                continue
+
+            if item[2] == constants.adjusted_type_capital_increase:
+                a = item[4] / item[3]
+                b = 0
+            elif item[2] == constants.adjusted_type_take_profit:
+                a = 1
+                b = item[3] - item[4]
+            else:
+                a = 1
+                b = 0
+
+            coeff_index = self.__find_index(np_array=coeff[:, 0], item=item[0] * 1000000, past_day=False)
+            coeff[:coeff_index + 1, 1] *= a
+            coeff[:coeff_index + 1, 2] += coeff[coeff_index, 1] * b
+
+        self.adjusted_function_list = coeff
+        # return coeff
+
     @staticmethod
     def __estimate_time(base_time, part_count, time_frame):
         import datetime
@@ -582,6 +599,82 @@ class SymbolDataSet:
                     return end
 
     # ---------------------------------
+    def get_raw_data_type0(self, data_type, candle_index, candle_count):
+        self.__grow_time_frame_data(candle_index, candle_count)
+        data = self.time_frame_data[candle_index:candle_index + candle_count]
+
+        if data_type == constants.data_type_all:
+            return data.astype(dtype='float64')
+
+        elif data_type == constants.data_type_time:
+            return data[:, (self.col_date_time, self.col_date_time)].astype(dtype='float64')
+
+        elif data_type == constants.data_type_open:
+            return data[:, (self.col_date_time, self.col_open_price)].astype(dtype='float64')
+
+        elif data_type == constants.data_type_close:
+            return data[:, (self.col_date_time, self.col_close_price)].astype(dtype='float64')
+
+        elif data_type == constants.data_type_high:
+            return data[:, (self.col_date_time, self.col_high_price)].astype(dtype='float64')
+
+        elif data_type == constants.data_type_low:
+            return data[:, (self.col_date_time, self.col_low_price)].astype(dtype='float64')
+
+        elif data_type == constants.data_type_volume:
+            return data[:, (self.col_date_time, self.col_trade_volume)].astype(dtype='float64')
+
+        elif data_type == constants.data_type_value:
+            return data[:, (self.col_date_time, self.col_trade_value)].astype(dtype='float64')
+
+        elif data_type == constants.data_type_median:
+            res = np.zeros((data.shape[0], 2))
+            res[:, 0] = data[:, self.col_date_time]
+            res[:, 1] = (data[:, self.col_high_price] + data[:, self.col_low_price]) / 2
+            return res
+
+        elif data_type == constants.data_type_typical:
+            res = np.zeros((data.shape[0], 2))
+            res[:, 0] = data[:, self.col_date_time]
+            res[:, 1] = (data[:, self.col_high_price] + data[:, self.col_low_price] + data[:, self.col_close_price]) / 3
+            return res
+
+        elif data_type == constants.data_type_weighted:
+            res = np.zeros((data.shape[0], 2))
+            res[:, 0] = data[:, self.col_date_time]
+            res[:, 1] = (data[:, self.col_high_price] + data[:, self.col_low_price] +
+                         data[:, self.col_close_price] * 2) / 4
+            return res
+
+    def get_adjusted_function_list0(self, candle_index, candle_count):
+        self.__grow_time_frame_data(candle_index, candle_count)
+
+        coeff = np.ones((self.time_frame_data[candle_index:candle_index + candle_count].shape[0], 3))  # [date, a, b]
+        coeff[:, 0] = self.time_frame_data[candle_index:candle_index + candle_count, 0]  # date
+        coeff[:, 2] *= 0  # b = 0
+
+        adj = self.all_adjusted_data[::-1]  # end to first
+        source_date = self.time_frame_data[0, 0]
+
+        for item in adj:
+            if item[0] * 1000000 > source_date or item[0] * 1000000 < coeff[-1, 0]:
+                continue
+
+            if item[2] == constants.adjusted_type_capital_increase:
+                a = item[4] / item[3]
+                b = 0
+            elif item[2] == constants.adjusted_type_take_profit:
+                a = 1
+                b = item[3] - item[4]
+            else:
+                a = 1
+                b = 0
+
+            coeff_index = self.__find_index(np_array=coeff[:, 0], item=item[0] * 1000000, past_day=False)
+            coeff[:coeff_index + 1, 1] *= a
+            coeff[:coeff_index + 1, 2] += coeff[coeff_index, 1] * b
+
+        return coeff
 
 
 def max_profit(data):
@@ -650,8 +743,8 @@ if __name__ == '__main__':
     print('---------------------')
     # print(a.__get_max_profit_data(0, 100))
     print('---------------------')
-    data, orders, max_profit = a.max_profit(0, a.origin_candle_count)
-    print(data)
+    data, orders, max_profit = a.max_profit(0, a.original_candle_count)
+    # print(data)
     print(orders)
     print(max_profit)
     # print(s[:, -2:])
@@ -662,7 +755,7 @@ if __name__ == '__main__':
     axes.plot(range(data.shape[0] - 1, -1, -1), data[:, 3], 'r')
     axes.plot(range(data.shape[0] - 1, -1, -1), data[:, 4])
     axes.scatter(range(data.shape[0] - 1, -1, -1), data[:, 6])
-    figure.show()
+    # figure.show()
     # a = np.array(range(s.shape[0] - 1,-1,-1))
     # print(a)
 

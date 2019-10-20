@@ -62,6 +62,7 @@ class Signal:
 
         if len(sig) > 0:
             index = self.data_set.get_candle_index(sig[0][self.date])
+            # print(index)
             data = self.data_set.get_adjusted_function_list(0, index + 1)
             for i in range(0, len(sig), 2):
                 buy_index = self.data_set.get_candle_index(sig[i][self.date])
