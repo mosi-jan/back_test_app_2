@@ -10,6 +10,10 @@ class SMA(BaseIndicator):
     def __init__(self, data_set, period):
         BaseIndicator.__init__(self, data_set)
 
+    def d(self, candle_index):
+        if candle_index % 2 > 0:
+            return candle_index
+        return candle_index + 1
 
 
 

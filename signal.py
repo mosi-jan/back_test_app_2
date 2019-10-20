@@ -55,9 +55,9 @@ class Signal:
                                 'price': self.signal_list[i][self.price],
                                 'action': self.signal_list[i][self.action]})
 
-        if sig[0][self.action] == 'sell':
+        if len(sig) > 0 and sig[0][self.action] == 'sell':
             sig.pop(0)
-        if sig[-1][self.action] == 'buy':
+        if len(sig) > 0 and sig[-1][self.action] == 'buy':
             sig.pop()
 
         if len(sig) > 0:

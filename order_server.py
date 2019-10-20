@@ -10,6 +10,10 @@ import ast
 from copy import deepcopy
 import os
 
+from run_strategy import RunStrategy
+
+from constants import adjust_today_candle_this_time
+
 
 server_status_running = 'running'
 server_status_stopping = 'stopping'
@@ -23,11 +27,27 @@ server_status_waiting = 'waiting'
 
 
 class StrategyThread(threading.Thread):
-    def __init__(self):
-        self.print_c = PrintColored(default_color='red')
-
+    #def __init__(self, database_info, en_symbol_12_digit_code, start_date_time, today_date_time, time_frame,
+    #             data_type, adjust_today_candle, adjusted_type, strategy, data_count, log_obj):
+    def __init__(self, database_info, data_count, log_obj, params):
         threading.Thread.__init__(self)
+        self.print_c = PrintColored(default_color='red')
         self.killed = False
+
+        self.database_info = database_info
+        self.data_count = data_count
+        self.log_obj = log_obj
+
+        self.obj = RunStrategy(database_info=self.database_info, data_count=self.data_count, log_obj=None, params=params)
+        self.init_error = self.obj.get_init_error()
+        if self.init_error is not None:
+            print(self.init_error)
+            return
+
+
+
+    def get_init_error(self):
+        return self.init_error
 
     def globaltrace(self, frame, event, arg):
         if event == 'call':
@@ -45,6 +65,8 @@ class StrategyThread(threading.Thread):
         self.killed = True
 
     def process(self):
+
+        print(self.obj.a())
         # self.print_c.print('running thread {0}'.format(threading.current_thread().getName()))
         sleep(2)
         # run strategy
@@ -61,9 +83,10 @@ class StrategyThread(threading.Thread):
 
 
 class RunOrder:
-    def __init__(self, web_database_info, order_run_time, max_worker, p_name, log_obj=None):
+    def __init__(self, web_database_info, analyze_database_info, order_run_time, max_worker, p_name, log_obj=None):
         self.max_worker = max_worker
         self.web_database_info = web_database_info
+        self.analyze_database_info = analyze_database_info
         self.order_run_time = order_run_time
         self.process_name = p_name
 
@@ -103,7 +126,11 @@ class RunOrder:
         return res
 
     def run(self):
-        order = None
+        #order = None
+        order_id = None
+        username = None
+        input_params = None
+
         try_num = 0
         max_try = 3
         clean_sub_order_result = False
@@ -120,7 +147,8 @@ class RunOrder:
                 continue
             # get order from database
             if try_again is False:
-                order, error = self.get_order()
+                #order, error = self.get_order()
+                order_id, username, input_params, error = self.get_order()
                 # print('get order order: {} error: {}'.format(order, error))
                 if error is not None:
                     if self.get_status() in [server_status_stopping, server_status_shutting_down]:
@@ -141,15 +169,11 @@ class RunOrder:
 
             self.set_status(server_status_running)
             try_num += 1
-            # ------------------------------
-            # extract order
-            order_id, username, input_params, adjusted_type, start_date_time, end_date_time, time_frame, \
-                order_total, order_same, data_type, accepted_symbol_list, output_format, strategy, \
-                current_strategy_name, strategy_variable, strategy_context = self.unpack_order(order)
 
+            # ------------------------------
             self.running_list.clear()
             self.complete_list.clear()
-            self.waiting_list = deepcopy(accepted_symbol_list)
+            self.waiting_list = deepcopy(input_params['accepted_symbol_list'])
             waiting_list_count = len(self.waiting_list)
 
             # print(self.waiting_list)
@@ -201,8 +225,13 @@ class RunOrder:
                         break_order = True
                         break
 
+                    # print(order)
                     # create new thread
-                    t = StrategyThread()
+                    t = StrategyThread(database_info=self.analyze_database_info,
+                                       data_count=0,
+                                       log_obj=None,
+                                       params=self.get_order_params(input_params, en_symbol_12_digit_code))
+
                     t.setName(en_symbol_12_digit_code)
                     t.start()
                     while not t.is_alive():
@@ -330,7 +359,44 @@ class RunOrder:
                 t.join()
 
     def get_order(self):
-        return self.web_db.get_new_order(order_run_time=self.order_run_time)
+        result, error = self.web_db.get_new_order(order_run_time=self.order_run_time)
+        if error is not None:
+            return None, None, None, error
+
+        order_id = result[0]
+        username = result[1]
+        input_params = ast.literal_eval(result[2])
+
+        error = self.check_input_params(input_params)
+        if error is not None:
+            return None, None, None, error
+
+        return order_id, username, input_params, error
+
+    def check_input_params(self, input_param):
+        keys = ['accepted_symbol_list', 'start_date_time', 'end_date_time', 'time_frame',
+                'data_type', 'adjusted_type', 'strategy',
+                'current_strategy_name', 'strategy_variable', 'strategy_context',
+                'output_format', 'order_same', 'order_total']
+
+        for k in keys:
+            if k not in input_param:
+                return 'invalid key param: {}'.format(k)
+
+        return None
+
+    def get_order_params(self, input_params, en_symbol_12_digit_code):
+        res = {'en_symbol_12_digit_code': en_symbol_12_digit_code,
+               'start_date_time': input_params['start_date_time'],
+               'today_date_time': input_params['end_date_time'],
+               'time_frame': input_params['time_frame'],
+               'data_type': input_params['data_type'],
+               'adjust_today_candle': adjust_today_candle_this_time,
+               'adjusted_type': input_params['adjusted_type'],
+               'strategy': [input_params['strategy_variable'], input_params['strategy_context']]}
+
+        return res
+
 
     @ staticmethod
     def unpack_order(order):
@@ -386,10 +452,13 @@ class RunOrder:
 
 if __name__ == '__main__':
     from database_info import get_database_info, laptop_local_access
-    database_info = get_database_info(laptop_local_access, 'bourse_web_order_0.1')
 
-    server = RunOrder(web_database_info=database_info,
-                      order_run_time=100, max_worker=2000,
+    web_database_info = get_database_info(laptop_local_access, 'bourse_web_order_0.1')
+    analyze_database_info = get_database_info(laptop_local_access, 'bourse_analyze_server_0.1')
+
+    server = RunOrder(web_database_info=web_database_info,
+                      analyze_database_info=analyze_database_info,
+                      order_run_time=10, max_worker=200,
                       p_name='server 1', log_obj=None)
 
     server.run()
