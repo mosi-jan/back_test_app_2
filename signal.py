@@ -19,11 +19,13 @@ class Signal:
 
     def sell(self, candle_index):
         data = self.data_set.get_raw_data(candle_index=candle_index, candle_count=1)
-        self.signal_list.append({'candle_index': candle_index, 'date': data[0, 0], 'price': data[0, 1], 'action': self.action_sell})
+        self.signal_list.append({'candle_index': candle_index, 'date': data[0, 0],
+                                 'price': data[0, 1], 'action': self.action_sell})
 
     def buy(self, candle_index):
         data = self.data_set.get_raw_data(candle_index=candle_index, candle_count=1)
-        self.signal_list.append({'candle_index': candle_index, 'date': data[0, 0], 'price': data[0, 1], 'action': self.action_buy})
+        self.signal_list.append({'candle_index': candle_index, 'date': data[0, 0],
+                                 'price': data[0, 1], 'action': self.action_buy})
 
     # def hold(self, candle_index):
     #    data = self.data_set.get_raw_data(candle_index=candle_index, candle_count=1)
@@ -76,13 +78,16 @@ class Signal:
 
                 # print('buy_index:{} sell_index:{} buy_p:{} sell_p:{} coeff:{}'
                 # .format(buy_index, sell_index, buy_p, sell_p,coeff))
-                # [buy_date, sell_date, buy_price, sell_price, benefit_coeff, order_day_count]
+                # [buy_date, sell_date, buy_price, sell_price, benefit_coeff,
+                # order_day_count, buy_candle_index, sell_candle_index]
                 order.append([sig[i][self.date],
                               sig[i + 1][self.date],
                               sig[i][self.price],
                               sig[i + 1][self.price],
                               coeff,
-                              buy_index - sell_index])
+                              buy_index - sell_index,
+                              buy_index,
+                              sell_index])
 
                 all_coeff *= coeff
 
