@@ -6,6 +6,9 @@ class Signal:
     date = 'date'
     price = 'price'
     action = 'action'
+    candle_index = 'candle_index'
+    action_sell = 'sell'
+    action_buy = 'buy'
 
     def __init__(self, data_set):
         self.data_set = data_set
@@ -16,11 +19,11 @@ class Signal:
 
     def sell(self, candle_index):
         data = self.data_set.get_raw_data(candle_index=candle_index, candle_count=1)
-        self.signal_list.append({'date': data[0, 0], 'price': data[0, 1], 'action': 'sell'})
+        self.signal_list.append({'candle_index': candle_index, 'date': data[0, 0], 'price': data[0, 1], 'action': self.action_sell})
 
     def buy(self, candle_index):
         data = self.data_set.get_raw_data(candle_index=candle_index, candle_count=1)
-        self.signal_list.append({'date': data[0, 0], 'price': data[0, 1], 'action': 'buy'})
+        self.signal_list.append({'candle_index': candle_index, 'date': data[0, 0], 'price': data[0, 1], 'action': self.action_buy})
 
     # def hold(self, candle_index):
     #    data = self.data_set.get_raw_data(candle_index=candle_index, candle_count=1)
@@ -51,22 +54,21 @@ class Signal:
             if stack.count(stack[-1]) >= part:
                 if last_signal != stack[-1]:
                     last_signal = stack[-1]
-                    sig.append({'date': self.signal_list[i][self.date],
-                                'price': self.signal_list[i][self.price],
-                                'action': self.signal_list[i][self.action]})
+                    sig.append(self.signal_list[i])
+                    # sig.append({'date': self.signal_list[i][self.date],
+                    #            'price': self.signal_list[i][self.price],
+                    #            'action': self.signal_list[i][self.action]})
 
-        if len(sig) > 0 and sig[0][self.action] == 'sell':
+        if len(sig) > 0 and sig[0][self.action] == self.action_sell:
             sig.pop(0)
-        if len(sig) > 0 and sig[-1][self.action] == 'buy':
+        if len(sig) > 0 and sig[-1][self.action] == self.action_buy:
             sig.pop()
 
         if len(sig) > 0:
-            index = self.data_set.get_candle_index(sig[0][self.date])
-            # print(index)
-            data = self.data_set.get_adjusted_function_list(0, index + 1)
+            data = self.data_set.get_adjusted_function_list(0, sig[0][self.candle_index] + 1)
             for i in range(0, len(sig), 2):
-                buy_index = self.data_set.get_candle_index(sig[i][self.date])
-                sell_index = self.data_set.get_candle_index(sig[i + 1][self.date])
+                buy_index = sig[i][self.candle_index]
+                sell_index = sig[i + 1][self.candle_index]
                 buy_p = data[buy_index, 1] * sig[i][self.price] * buy_wage + data[buy_index, 2]
                 sell_p = data[sell_index, 1] * sig[i + 1][self.price] * sell_wage + data[sell_index, 2]
 
@@ -79,7 +81,8 @@ class Signal:
                               sig[i + 1][self.date],
                               sig[i][self.price],
                               sig[i + 1][self.price],
-                              coeff, buy_index - sell_index])
+                              coeff,
+                              buy_index - sell_index])
 
                 all_coeff *= coeff
 
