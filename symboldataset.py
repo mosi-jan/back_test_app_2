@@ -9,6 +9,7 @@ from signal import Signal
 
 
 class SymbolDataSet:
+
     def __init__(self, database_info, en_symbol_12_digit_code, start_date_time, today_date_time, time_frame,
                  data_type, adjust_today_candle, adjusted_type, data_count=0, log_obj=None):
         # init params
@@ -676,6 +677,487 @@ class SymbolDataSet:
 
         return coeff
 
+    def analyze_order1(self, order):
+        buy_date, sell_date, buy_price, sell_price, coeff, candle_count = range(6)
+
+        total_order = len(order)
+
+        max_coeff = 1
+        min_coeff = 100
+
+        profit_order_count = 0
+        profit_order_sum_coeff = 0
+        profit_order_sum_candle_count = 0
+        profit_order_coeff = 1
+
+        lose_order_count = 0
+        lose_order_sum_coeff = 0
+        lose_order_sum_candle_count = 0
+        lose_order_coeff = 1
+
+        none_pl_order_count = 0
+        none_pl_order_sum_candle_count = 0
+
+        for item in order:
+            # min max coeff
+            if item[coeff] > max_coeff:
+                max_coeff = item[coeff]
+            elif item[coeff] < min_coeff:
+                min_coeff = item[coeff]
+
+            # order count
+            if item[coeff] > 1:
+                profit_order_count += 1
+                profit_order_sum_coeff += item[coeff]
+                profit_order_sum_candle_count += item[candle_count]
+                profit_order_coeff *= item[coeff]
+
+            elif item[coeff] < 1:
+                lose_order_count += 1
+                lose_order_sum_coeff += item[coeff]
+                lose_order_sum_candle_count += item[candle_count]
+                lose_order_coeff *= item[coeff]
+
+            else:
+                none_pl_order_count += 1
+                none_pl_order_sum_candle_count += item[candle_count]
+
+        print('-----------')
+        print('max_coeff: {}'.format(max_coeff))
+        print('min_coeff: {}'.format(min_coeff))
+        print('profit_order_count: {}'.format(profit_order_count))
+        print('profit_order_sum_coeff: {}'.format(profit_order_sum_coeff))
+        print('profit_order_sum_candle_count: {}'.format(profit_order_sum_candle_count))
+        print('profit_order_coeff: {}'.format(profit_order_coeff))
+
+        print('-----------')
+        print('lose_order_count: {}'.format(lose_order_count))
+        print('lose_order_sum_coeff: {}'.format(lose_order_sum_coeff))
+        print('lose_order_sum_candle_count: {}'.format(lose_order_sum_candle_count))
+        print('lose_order_coeff: {}'.format(lose_order_coeff))
+
+        print('-----------')
+        print('none_pl_order_count: {}'.format(none_pl_order_count))
+        print('none_pl_order_sum_candle_count: {}'.format(none_pl_order_sum_candle_count))
+        print('-----------')
+        print('\n+++++++++++++++++++++++++')
+        print('profit_order_count/total_order: {}'.format(profit_order_count / total_order))
+        print('lose_order_count/total_order: {}'.format(lose_order_count / total_order))
+        # print('max_coeff: {}'.format(max_coeff))
+
+    def analyze_order0(self, order):
+        buy_date, sell_date, buy_price, sell_price, coeff, candle_count = range(6)
+
+        max_coeff = -100
+        min_coeff = 100
+
+        profit_order_count = 0
+        profit_order_sum_coeff = 0
+        profit_order_sum_candle_count = 0
+        profit_order_coeff = 1
+
+        lose_order_count = 0
+        lose_order_sum_coeff = 0
+        lose_order_sum_candle_count = 0
+        lose_order_coeff = 1
+
+        none_pl_order_count = 0
+        none_pl_order_sum_candle_count = 0
+
+        for item in order:
+            # min max coeff
+            if item[coeff] > max_coeff:
+                max_coeff = item[coeff]
+            elif item[coeff] < min_coeff:
+                min_coeff = item[coeff]
+
+            # order count
+            if item[coeff] > 1:
+                profit_order_count += 1
+                profit_order_sum_coeff += item[coeff]
+                profit_order_sum_candle_count += item[candle_count]
+                profit_order_coeff *= item[coeff]
+
+            elif item[coeff] < 1:
+                lose_order_count += 1
+                lose_order_sum_coeff += item[coeff]
+                lose_order_sum_candle_count += item[candle_count]
+                lose_order_coeff *= item[coeff]
+
+            else:
+                none_pl_order_count += 1
+                none_pl_order_sum_candle_count += item[candle_count]
+
+        total_order_count = len(order)
+        total_order_candle_count = profit_order_sum_candle_count + lose_order_sum_candle_count + \
+                                   none_pl_order_sum_candle_count
+
+        if total_order_count > 0:
+            profit_order_count_percent = profit_order_count / total_order_count
+            lose_order_count_percent = lose_order_count / total_order_count
+            none_pl_order_count_percent = none_pl_order_count / total_order_count
+        else:
+            profit_order_count_percent = 0
+            lose_order_count_percent = 0
+            none_pl_order_count_percent = 0
+
+        if total_order_candle_count > 0:
+            profit_order_sum_candle_count_percent = profit_order_sum_candle_count / total_order_candle_count
+            lose_order_sum_candle_count_percent = lose_order_sum_candle_count / total_order_candle_count
+            none_pl_order_sum_candle_count_percent = none_pl_order_sum_candle_count / total_order_candle_count
+        else:
+            profit_order_sum_candle_count_percent = 0
+            lose_order_sum_candle_count_percent = 0
+            none_pl_order_sum_candle_count_percent = 0
+
+        if profit_order_count > 0:
+            profit_order_sum_coeff_average = profit_order_sum_coeff / profit_order_count
+        else:
+            profit_order_sum_coeff_average = 0
+
+        if lose_order_count > 0:
+            lose_order_sum_coeff_average = lose_order_sum_coeff / lose_order_count
+        else:
+            lose_order_sum_coeff_average = 0
+
+        print('--------------------------------------------------')
+        print('total_order: {}'.format(total_order_count))
+        print('total_order_candle_count: {}'.format(total_order_candle_count))
+        print('max_coeff: {}'.format(max_coeff))
+        print('min_coeff: {}'.format(min_coeff))
+        print('-----------')
+
+        print('profit_order_count: {}'.format(profit_order_count))
+        print('profit_order_sum_coeff: {}'.format(profit_order_sum_coeff))
+        print('profit_order_sum_candle_count: {}'.format(profit_order_sum_candle_count))
+        print('profit_order_coeff: {}'.format(profit_order_coeff))
+
+        print('-----------')
+        print('lose_order_count: {}'.format(lose_order_count))
+        print('lose_order_sum_coeff: {}'.format(lose_order_sum_coeff))
+        print('lose_order_sum_candle_count: {}'.format(lose_order_sum_candle_count))
+        print('lose_order_coeff: {}'.format(lose_order_coeff))
+
+        print('-----------')
+        print('none_pl_order_count: {}'.format(none_pl_order_count))
+        print('none_pl_order_sum_candle_count: {}'.format(none_pl_order_sum_candle_count))
+        #print('-----------')
+        print('\n+++++++++++++++++++++++++')
+        print('total_order_count: {}'.format(total_order_count))
+        print('total_order_candle_count: {}'.format(total_order_candle_count))
+        print('max_coeff: {}'.format(max_coeff))
+        print('min_coeff: {}'.format(min_coeff))
+        print('profit_order_count_percent: {}'.format(profit_order_count_percent))
+        print('lose_order_count_percent: {}'.format(lose_order_count_percent))
+        print('none_pl_order_count_percent: {}'.format(none_pl_order_count_percent))
+        print('profit_order_sum_candle_count_percent: {}'.format(profit_order_sum_candle_count_percent))
+        print('lose_order_sum_candle_count_percent: {}'.format(lose_order_sum_candle_count_percent))
+        print('none_pl_order_sum_candle_count_percent: {}'.format(none_pl_order_sum_candle_count_percent))
+        print('profit_order_sum_coeff_average: {}'.format(profit_order_sum_coeff_average-1))
+        print('lose_order_sum_coeff_average: {}'.format(1-lose_order_sum_coeff_average))
+
+        print('+++++++++++++++++++++++++\n')
+
+    def analyze_order(self, orders, split_time_frame):
+        buy_date, sell_date, buy_price, sell_price, coeff, candle_count, buy_index, sell_index = range(8)
+
+        result = list()
+        # time_frame_start_index = 0
+        time_frame_end_index = 0
+        time_frame_end_date = orders[-1][sell_date]
+
+        splited_time_frame = self.splited_time_frame(split_time_frame = split_time_frame,
+                                                     start_candle_index=orders[0][buy_index],
+                                                     end_candle_index=orders[-1][sell_index])
+        print('splited_time_frame')
+        print(splited_time_frame)
+        print(len(splited_time_frame))
+
+        for time_frame in splited_time_frame:
+            time_frame_start_date = time_frame[0]
+            time_frame_start_index = time_frame[1]
+
+            max_coeff = -100
+            min_coeff = 100
+
+            profit_order_count = 0
+            profit_order_sum_coeff = 0
+            profit_order_sum_candle_count = 0
+            profit_order_coeff = 1
+
+            lose_order_count = 0
+            lose_order_sum_coeff = 0
+            lose_order_sum_candle_count = 0
+            lose_order_coeff = 1
+
+            none_pl_order_count = 0
+            none_pl_order_sum_candle_count = 0
+
+            if time_frame_start_index != time_frame_end_index:
+                for order in orders:
+                    if order[buy_index] <= time_frame_end_index:
+                        order_start = -1
+                        order_end = -1
+
+                    elif order[buy_index] <= time_frame_start_index:
+                        order_start = order[buy_index]
+                        if order[sell_index] >= time_frame_end_index:
+                            order_end = order[sell_index]
+                        else:
+                            order_end = time_frame_end_index
+                    else:
+                        if order[sell_index] >= time_frame_end_index:
+                            order_start = time_frame_start_index
+                            order_end = order[sell_index]
+
+                        else:
+                            order_start = -1
+                            order_end = -1
+
+                    # calculate params
+                    order_coeff = float(order_start - order_end) / float(order[candle_count])
+
+                    if order_coeff <= 0:
+                        continue  # next order
+
+                    # min max coeff
+                    if (order[coeff] - 1) * order_coeff + 1 > max_coeff:
+                        max_coeff = (order[coeff] - 1) * order_coeff + 1
+
+                    if (order[coeff] - 1) * order_coeff + 1 < min_coeff:
+                        min_coeff = (order[coeff] - 1) * order_coeff + 1
+
+                    # order count
+                    if (order[coeff] - 1) * order_coeff + 1 > 1:
+                        profit_order_count += order_coeff
+                        profit_order_sum_coeff += (order[coeff] - 1) * order_coeff + 1
+                        profit_order_sum_candle_count += order[candle_count] * order_coeff
+                        profit_order_coeff *= (order[coeff] - 1) * order_coeff + 1
+
+                    elif (order[coeff] - 1) * order_coeff + 1 < 1:
+                        lose_order_count += order_coeff
+                        lose_order_sum_coeff += (order[coeff] - 1) * order_coeff + 1
+                        lose_order_sum_candle_count += order[candle_count] * order_coeff
+                        lose_order_coeff *= (order[coeff] - 1) * order_coeff + 1
+
+                    else:
+                        none_pl_order_count += order_coeff
+                        none_pl_order_sum_candle_count += order[candle_count] * order_coeff
+
+            profit_order_sum_candle_count = int(profit_order_sum_candle_count)
+            lose_order_sum_candle_count = int(lose_order_sum_candle_count)
+            none_pl_order_sum_candle_count = int(none_pl_order_sum_candle_count)
+
+            if max_coeff == -100:
+                max_coeff = 1
+
+            if min_coeff == 100:
+                min_coeff = 1
+            # ------------------
+            total_order_count = profit_order_count + lose_order_count + none_pl_order_count
+            total_order_candle_count = profit_order_sum_candle_count + lose_order_sum_candle_count + \
+                                       none_pl_order_sum_candle_count
+
+            if total_order_count > 0:
+                profit_order_count_percent = profit_order_count / total_order_count
+                lose_order_count_percent = lose_order_count / total_order_count
+                none_pl_order_count_percent = none_pl_order_count / total_order_count
+            else:
+                profit_order_count_percent = 0
+                lose_order_count_percent = 0
+                none_pl_order_count_percent = 0
+
+            if total_order_candle_count > 0:
+                profit_order_sum_candle_count_percent = profit_order_sum_candle_count / total_order_candle_count
+                lose_order_sum_candle_count_percent = lose_order_sum_candle_count / total_order_candle_count
+                none_pl_order_sum_candle_count_percent = none_pl_order_sum_candle_count / total_order_candle_count
+            else:
+                profit_order_sum_candle_count_percent = 0
+                lose_order_sum_candle_count_percent = 0
+                none_pl_order_sum_candle_count_percent = 0
+
+            if profit_order_count > 0:
+                profit_order_sum_coeff_average = profit_order_sum_coeff / profit_order_count
+            else:
+                profit_order_sum_coeff_average = 0
+
+            if lose_order_count > 0:
+                lose_order_sum_coeff_average = lose_order_sum_coeff / lose_order_count
+            else:
+                lose_order_sum_coeff_average = 0
+
+            coefficent = profit_order_count_percent * profit_order_sum_candle_count_percent * profit_order_sum_coeff_average
+
+            result.append([split_time_frame, time_frame_start_date, time_frame_end_date,
+                           total_order_candle_count,
+                           profit_order_count_percent,
+                           lose_order_count_percent,
+                           none_pl_order_count_percent,
+                           profit_order_sum_candle_count_percent,
+                           lose_order_sum_candle_count_percent,
+                           none_pl_order_sum_candle_count_percent,
+                           profit_order_sum_coeff_average,
+                           lose_order_sum_coeff_average, coefficent
+                           ])
+
+            #result.append([[time_frame_start_index, time_frame_end_index], [total_order_count,
+            #                                                    total_order_candle_count,
+            #                                                    profit_order_count_percent,
+            #                                                    lose_order_count_percent,
+            #                                                    none_pl_order_count_percent,
+            #                                                    profit_order_sum_candle_count_percent,
+            #                                                    lose_order_sum_candle_count_percent,
+            #                                                    none_pl_order_sum_candle_count_percent,
+            #                                                    profit_order_sum_coeff_average,
+            #                                                    lose_order_sum_coeff_average]])
+
+            time_frame_end_index = time_frame_start_index
+            time_frame_end_date = time_frame_start_date
+
+            print('********************************************************')
+            print('********************************************************')
+            print('total_order: {}'.format(total_order_count))
+            print('total_order_candle_count: {}'.format(total_order_candle_count))
+            print('max_coeff: {}'.format(max_coeff))
+            print('min_coeff: {}'.format(min_coeff))
+            print('-----------')
+
+            print('profit_order_count: {}'.format(profit_order_count))
+            print('profit_order_sum_coeff: {}'.format(profit_order_sum_coeff))
+            print('profit_order_sum_candle_count: {}'.format(profit_order_sum_candle_count))
+            print('profit_order_coeff: {}'.format(profit_order_coeff))
+
+            print('-----------')
+            print('lose_order_count: {}'.format(lose_order_count))
+            print('lose_order_sum_coeff: {}'.format(lose_order_sum_coeff))
+            print('lose_order_sum_candle_count: {}'.format(lose_order_sum_candle_count))
+            print('lose_order_coeff: {}'.format(lose_order_coeff))
+
+            print('-----------')
+            print('none_pl_order_count: {}'.format(none_pl_order_count))
+            print('none_pl_order_sum_candle_count: {}'.format(none_pl_order_sum_candle_count))
+            # print('-----------')
+            print('\n+++++++++++++++++++++++++')
+            print('total_order_count: {}'.format(total_order_count))
+            print('total_order_candle_count: {}'.format(total_order_candle_count))
+            print('max_coeff: {}'.format(max_coeff))
+            print('min_coeff: {}'.format(min_coeff))
+            print('profit_order_count_percent: {}'.format(profit_order_count_percent))
+            print('lose_order_count_percent: {}'.format(lose_order_count_percent))
+            print('none_pl_order_count_percent: {}'.format(none_pl_order_count_percent))
+            print('profit_order_sum_candle_count_percent: {}'.format(profit_order_sum_candle_count_percent))
+            print('lose_order_sum_candle_count_percent: {}'.format(lose_order_sum_candle_count_percent))
+            print('none_pl_order_sum_candle_count_percent: {}'.format(none_pl_order_sum_candle_count_percent))
+            print('profit_order_sum_coeff_average: {}'.format(profit_order_sum_coeff_average - 1))
+            print('lose_order_sum_coeff_average: {}'.format(1 - lose_order_sum_coeff_average))
+
+            print('+++++++++++++++++++++++++\n')
+
+        res = np.array(result)
+        return res
+
+    def splited_time_frame(self, split_time_frame, start_candle_index, end_candle_index):
+        from constants import time_frame_s1, time_frame_m1, time_frame_h1, time_frame_d1, time_frame_mn1, time_frame_y1
+        time_frame_mn2 = 'MN2'
+        result = list()
+        data = self.get_raw_data(candle_index=end_candle_index,
+                                          candle_count=start_candle_index - end_candle_index + 1)
+
+        if split_time_frame == time_frame_s1:
+            coeff = 1
+        elif split_time_frame == time_frame_m1:
+            coeff = 100
+        elif split_time_frame == time_frame_h1:
+            coeff = 10000
+        elif split_time_frame == time_frame_d1:
+            coeff = 1000000
+        elif split_time_frame == time_frame_mn1:
+            coeff = 100000000
+
+        elif split_time_frame == time_frame_mn2:
+            coeff = 100000000
+
+        elif split_time_frame == time_frame_y1:
+            coeff = 10000000000
+        else:
+            coeff = 1
+
+        m = data[0, 0] // coeff
+        for i in range(data.shape[0]):
+            if data[i, 0] // coeff != m:
+                result.append([data[i - 1, 0], end_candle_index + i - 1])
+                m = data[i, 0] // coeff
+
+        if data[-1, 0] // coeff == m:
+            result.append([data[data.shape[0] - 1, 0], end_candle_index + data.shape[0] - 1])
+
+        return result
+
+    def splited_time_frame1(self, split_time_frame, start_candle_index, end_candle_index):
+        from constants import time_frame_s1, time_frame_m1, time_frame_h1, time_frame_d1, time_frame_mn1, time_frame_y1
+
+        result = list()
+        data = self.get_raw_data(candle_index=end_candle_index,
+                                          candle_count=start_candle_index - end_candle_index + 1)
+
+        if split_time_frame == time_frame_s1:
+            coeff = 1
+        elif split_time_frame == time_frame_m1:
+            coeff = 100
+        elif split_time_frame == time_frame_h1:
+            coeff = 10000
+        elif split_time_frame == time_frame_d1:
+            coeff = 1000000
+        elif split_time_frame == time_frame_mn1:
+            coeff = 100000000
+        elif split_time_frame == time_frame_y1:
+            coeff = 10000000000
+        else:
+            coeff = 1
+
+        m = data[0, 0] // coeff
+        for i in range(data.shape[0]):
+            if data[i, 0] // coeff != m:
+                result.append([data[i - 1, 0], end_candle_index + i - 1])
+                m = data[i, 0] // coeff
+
+        if data[-1, 0] // coeff == m:
+            result.append([data[data.shape[0] - 1, 0], end_candle_index + data.shape[0] - 1])
+
+        return result
+
+    def splited_time_frame0(self, split_time_frame, start_candle_index, end_candle_index):
+        from constants import time_frame_s1, time_frame_m1, time_frame_h1, time_frame_d1, time_frame_mn1, time_frame_y1
+
+        result = list()
+        data = self.get_raw_data(candle_index=end_candle_index,
+                                          candle_count=start_candle_index - end_candle_index + 1)
+
+        if split_time_frame == time_frame_s1:
+            coeff = 1
+        elif split_time_frame == time_frame_m1:
+            coeff = 100
+        elif split_time_frame == time_frame_h1:
+            coeff = 10000
+        elif split_time_frame == time_frame_d1:
+            coeff = 1000000
+        elif split_time_frame == time_frame_mn1:
+            coeff = 100000000
+        elif split_time_frame == time_frame_y1:
+            coeff = 10000000000
+        else:
+            coeff = 1
+
+        m = data[0, 0] // coeff
+        for i in range(data.shape[0]):
+            if data[i, 0] // coeff != m:
+                result.append([data[i - 1, 0], end_candle_index + i - 1])
+                m = data[i, 0] // coeff
+
+        if data[-1, 0] // coeff == m:
+            result.append([data[data.shape[0] - 1, 0], end_candle_index + data.shape[0] - 1])
+
+        return result
 
 def max_profit(data):
     buy_wage = 1 - 0.1
@@ -748,6 +1230,14 @@ if __name__ == '__main__':
     print(orders)
     print(max_profit)
     # print(s[:, -2:])
+    a.analyze_order0(orders)
+    q = a.analyze_order(orders, 'MN1')
+    print(q)
+    print(q.shape)
+    print('\n-----------------------------------------------------\n')
+    q = a.analyze_order(orders, 'MN2')
+    print(q)
+    print(q.shape)
 
     figure = plt.figure(num=None, figsize=(16, 9), dpi=300, facecolor='w', edgecolor='k', linewidth=1)
     axes = figure.add_axes([0.05, 0.05, 0.9, 0.9], projection=None)

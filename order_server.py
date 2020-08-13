@@ -65,10 +65,14 @@ class StrategyThread(threading.Thread):
         self.killed = True
 
     def process(self):
-
-        print(self.obj.a())
+        self.obj.exec()
+        #order, coeff = self.obj.a()
+        #print(order)
+        #print(coeff)
+        #self.obj.analyze_order(order, 'MN1')
+        #self.obj.analyze_order_total(order)
         # self.print_c.print('running thread {0}'.format(threading.current_thread().getName()))
-        sleep(2)
+        sleep(0.1)
         # run strategy
         return True
 
@@ -393,7 +397,9 @@ class RunOrder:
                'data_type': input_params['data_type'],
                'adjust_today_candle': adjust_today_candle_this_time,
                'adjusted_type': input_params['adjusted_type'],
-               'strategy': [input_params['strategy_variable'], input_params['strategy_context']]}
+               'strategy': [input_params['strategy_variable'], input_params['strategy_context']],
+               'order_same': input_params['order_same'],
+               'order_total': input_params['order_total']}
 
         return res
 
@@ -458,7 +464,7 @@ if __name__ == '__main__':
 
     server = RunOrder(web_database_info=web_database_info,
                       analyze_database_info=analyze_database_info,
-                      order_run_time=10, max_worker=200,
+                      order_run_time=10, max_worker=1,
                       p_name='server 1', log_obj=None)
 
     server.run()
