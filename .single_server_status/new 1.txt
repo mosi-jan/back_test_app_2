@@ -1,0 +1,17 @@
+{'adjusted_type': '3', 
+'start_date_time': '20171015000000', 
+'end_date_time': '20190703000000', 
+'time_frame': 'D1', 
+'max_benefit_up': 10, 
+'max_benefit_down': 5, 
+'order_total': 3, 
+'order_same': 2, 
+'data_type': 'close', 
+'accepted_symbol_list': ['IRO1AMIN0001', 'IRO3ASPZ0001'], 
+'output_format': ['max_benefit'], 
+'strategy': 'strategy_test_1', 
+'current_strategy_name': 'strategy_test_1', 
+'strategy_variable': 'macd = MACD(26, 12, 9, self.bt_data)', 
+'strategy_context': 'if macd.macd_line(0) > macd.signal_line(0):\r\n    self.signal.buy()\r\nelif macd.macd_line(0) < macd.signal_line(0):\r\n    self.signal.sell()\r\nelse:\r\n    self.signal.hold()'}
+
+
